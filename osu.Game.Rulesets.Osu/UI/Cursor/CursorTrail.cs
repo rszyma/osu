@@ -248,6 +248,7 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
             private Vector2 cursorScale;
 
             private readonly TrailPart[] parts = new TrailPart[max_sprites];
+            private int partCount;
             private Vector2 originPosition;
 
             private IVertexBatch<TexturedTrailVertex> vertexBatch;
@@ -280,7 +281,46 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
                 else if (Source.TrailOrigin.HasFlag(Anchor.y2))
                     originPosition.Y = 1f;
 
-                Source.parts.CopyTo(parts, 0);
+                copyVisibleParts();
+            }
+
+            /// <summary>
+            /// Copies the parts which are still visible, instead of all <see cref="max_sprites"/> of them.
+            /// </summary>
+            /// <remarks>
+            /// Parts are added to a ring in order of time, so the visible parts are the newest ones,
+            /// a contiguous range of the ring which ends before <see cref="CursorTrail.currentIndex"/>.
+            /// They keep the order of their indices, so that they are drawn in the same order as before.
+            /// </remarks>
+            private void copyVisibleParts()
+            {
+                var sourceParts = Source.parts;
+                int end = Source.currentIndex;
+                int count = 0;
+
+                while (count < max_sprites)
+                {
+                    ref readonly var part = ref sourceParts[(end - count - 1 + max_sprites) % max_sprites];
+
+                    if (part.InvalidationID == -1 || time - part.Time >= 1)
+                        break;
+
+                    count++;
+                }
+
+                int start = (end - count + max_sprites) % max_sprites;
+
+                if (start + count <= max_sprites)
+                    Array.Copy(sourceParts, start, parts, 0, count);
+                else
+                {
+                    // The range wraps around the end of the ring, and the parts at the lowest indices come first.
+                    int wrapped = start + count - max_sprites;
+                    Array.Copy(sourceParts, 0, parts, 0, wrapped);
+                    Array.Copy(sourceParts, start, parts, wrapped, max_sprites - start);
+                }
+
+                partCount = count;
             }
 
             private IUniformBuffer<CursorTrailParameters> cursorTrailParameters;
@@ -310,7 +350,7 @@ namespace osu.Game.Rulesets.Osu.UI.Cursor
                 float sin = MathF.Sin(angle);
                 float cos = MathF.Cos(angle);
 
-                foreach (var part in parts)
+                foreach (var part in parts.AsSpan(0, partCount))
                 {
                     if (part.InvalidationID == -1)
                         continue;
