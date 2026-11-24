@@ -101,6 +101,22 @@ namespace osu.Game.Rulesets.UI
                 mostValidObject = null;
         }
 
+        // A loop instead of LINQ, as this runs for most key presses.
+        private HitObjectLifetimeEntry? getEarliestNotHitAliveEntry()
+        {
+            HitObjectLifetimeEntry? earliest = null;
+
+            foreach (var kvp in hitObjectContainer.AliveEntries)
+            {
+                var entry = kvp.Key;
+
+                if (!isAlreadyHit(entry) && (earliest == null || entry.HitObject.StartTime < earliest.HitObject.StartTime))
+                    earliest = entry;
+            }
+
+            return earliest;
+        }
+
         protected HitObject? GetMostValidObject()
         {
             if (mostValidObject == null || isAlreadyHit(mostValidObject))
@@ -109,7 +125,7 @@ namespace osu.Game.Rulesets.UI
                 // If required, we can make this lookup more efficient by adding support to get next-future-entry in LifetimeEntryManager.
                 var candidate =
                     // Use alive entries first as an optimisation.
-                    hitObjectContainer.AliveEntries.Keys.Where(e => !isAlreadyHit(e)).MinBy(e => e.HitObject.StartTime)
+                    getEarliestNotHitAliveEntry()
                     ?? hitObjectContainer.Entries.Where(e => !isAlreadyHit(e)).MinBy(e => e.HitObject.StartTime);
 
                 // In the case there are no non-judged objects, the last hit object should be used instead.
