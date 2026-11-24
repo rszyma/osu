@@ -5,7 +5,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Input.Handlers;
 using osu.Framework.Input.StateChanges;
 using osu.Framework.Input.StateChanges.Events;
@@ -35,47 +34,59 @@ namespace osu.Game.Input.Handlers
 
         public override bool Initialize(GameHost host) => true;
 
+        /// <remarks>
+        /// Replay input handlers may apply the same instance in each frame with different <see cref="PressedActions"/>.
+        /// </remarks>
         public class ReplayState<T> : IInput
             where T : struct
         {
             public List<T> PressedActions;
+
+            private ReplayStateChangeEvent<T> changeEvent;
 
             public void Apply(InputState state, IInputStateChangeHandler handler)
             {
                 if (!(state is RulesetInputManagerInputState<T> inputState))
                     throw new InvalidOperationException($"{nameof(ReplayState<>)} should only be applied to a {nameof(RulesetInputManagerInputState<>)}");
 
-                T[] released = Array.Empty<T>();
-                T[] pressed = Array.Empty<T>();
+                // The event is handled before this returns, so it can be used again for the next frame.
+                if (changeEvent == null || changeEvent.State != state)
+                    changeEvent = new ReplayStateChangeEvent<T>(state, this, new List<T>(), new List<T>());
 
-                var lastPressed = inputState.LastReplayState?.PressedActions;
+                var lastPressed = inputState.LastPressedActions;
+                var released = changeEvent.ReleasedActions;
+                var pressed = changeEvent.PressedActions;
 
-                if (lastPressed == null || lastPressed.Count == 0)
+                released.Clear();
+                pressed.Clear();
+
+                foreach (var action in lastPressed)
                 {
-                    pressed = PressedActions.ToArray();
+                    if (!PressedActions.Contains(action) && !released.Contains(action))
+                        released.Add(action);
                 }
-                else if (PressedActions.Count == 0)
+
+                foreach (var action in PressedActions)
                 {
-                    released = lastPressed.ToArray();
+                    if (!lastPressed.Contains(action) && !pressed.Contains(action))
+                        pressed.Add(action);
                 }
-                else if (!lastPressed.SequenceEqual(PressedActions))
-                {
-                    released = lastPressed.Except(PressedActions).ToArray();
-                    pressed = PressedActions.Except(lastPressed).ToArray();
-                }
+
+                lastPressed.Clear();
+                lastPressed.AddRange(PressedActions);
 
                 inputState.LastReplayState = this;
 
-                handler.HandleInputStateChange(new ReplayStateChangeEvent<T>(state, this, released, pressed));
+                handler.HandleInputStateChange(changeEvent);
             }
         }
 
         public class ReplayStateChangeEvent<T> : InputStateChangeEvent
         {
-            public readonly T[] ReleasedActions;
-            public readonly T[] PressedActions;
+            public readonly List<T> ReleasedActions;
+            public readonly List<T> PressedActions;
 
-            public ReplayStateChangeEvent(InputState state, IInput input, T[] releasedActions, T[] pressedActions)
+            public ReplayStateChangeEvent(InputState state, IInput input, List<T> releasedActions, List<T> pressedActions)
                 : base(state, input)
             {
                 ReleasedActions = releasedActions;
@@ -93,9 +104,16 @@ namespace osu.Game.Input.Handlers
             /// </summary>
             public ReplayFrame Frame;
 
+            private ReplayStatisticsFrameEvent frameEvent;
+
             public void Apply(InputState state, IInputStateChangeHandler handler)
             {
-                handler.HandleInputStateChange(new ReplayStatisticsFrameEvent(state, this, Frame));
+                if (frameEvent == null || frameEvent.State != state)
+                    frameEvent = new ReplayStatisticsFrameEvent(state, this, Frame);
+                else
+                    frameEvent.Frame = Frame;
+
+                handler.HandleInputStateChange(frameEvent);
             }
         }
 
@@ -107,7 +125,7 @@ namespace osu.Game.Input.Handlers
             /// <summary>
             /// The frame containing the statistics.
             /// </summary>
-            public readonly ReplayFrame Frame;
+            public ReplayFrame Frame { get; internal set; }
 
             public ReplayStatisticsFrameEvent(InputState state, IInput input, ReplayFrame frame)
                 : base(state, input)

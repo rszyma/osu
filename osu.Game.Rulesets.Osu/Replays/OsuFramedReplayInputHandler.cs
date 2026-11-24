@@ -17,14 +17,22 @@ namespace osu.Game.Rulesets.Osu.Replays
         {
         }
 
+        private static readonly List<OsuAction> no_actions = new List<OsuAction>();
+
+        private readonly MousePositionAbsoluteInput positionInput = new MousePositionAbsoluteInput();
+        private readonly ReplayState<OsuAction> replayState = new ReplayState<OsuAction>();
+
         protected override bool IsImportant(OsuReplayFrame frame) => frame.Actions.Any();
 
         protected override void CollectReplayInputs(List<IInput> inputs)
         {
             var position = Interpolation.ValueAt(CurrentTime, StartFrame.Position, EndFrame.Position, StartFrame.Time, EndFrame.Time);
 
-            inputs.Add(new MousePositionAbsoluteInput { Position = GamefieldToScreenSpace(position) });
-            inputs.Add(new ReplayState<OsuAction> { PressedActions = CurrentFrame?.Actions ?? new List<OsuAction>() });
+            positionInput.Position = GamefieldToScreenSpace(position);
+            inputs.Add(positionInput);
+
+            replayState.PressedActions = CurrentFrame?.Actions ?? no_actions;
+            inputs.Add(replayState);
         }
     }
 }

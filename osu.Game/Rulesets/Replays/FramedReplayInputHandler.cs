@@ -90,6 +90,8 @@ namespace osu.Game.Rulesets.Replays
 
         private int currentFrameIndex;
 
+        private readonly ReplayStatisticsFrameInput statisticsFrameInput = new ReplayStatisticsFrameInput();
+
         private const double sixty_frame_time = 1000.0 / 60;
 
         protected FramedReplayInputHandler(Replay replay)
@@ -181,7 +183,10 @@ namespace osu.Game.Rulesets.Replays
             CollectReplayInputs(inputs);
 
             if (CurrentFrame?.Header != null)
-                inputs.Add(new ReplayStatisticsFrameInput { Frame = CurrentFrame });
+            {
+                statisticsFrameInput.Frame = CurrentFrame;
+                inputs.Add(statisticsFrameInput);
+            }
         }
 
         protected virtual void CollectReplayInputs(List<IInput> inputs)

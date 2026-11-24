@@ -17,17 +17,19 @@ namespace osu.Game.Rulesets.Catch.Replays
         {
         }
 
+        private static readonly List<CatchAction> no_actions = new List<CatchAction>();
+
+        private readonly CatchReplayState replayState = new CatchReplayState();
+
         protected override bool IsImportant(CatchReplayFrame frame) => frame.Actions.Any();
 
         protected override void CollectReplayInputs(List<IInput> inputs)
         {
             float position = Interpolation.ValueAt(CurrentTime, StartFrame.Position, EndFrame.Position, StartFrame.Time, EndFrame.Time);
 
-            inputs.Add(new CatchReplayState
-            {
-                PressedActions = CurrentFrame?.Actions ?? new List<CatchAction>(),
-                CatcherX = position
-            });
+            replayState.PressedActions = CurrentFrame?.Actions ?? no_actions;
+            replayState.CatcherX = position;
+            inputs.Add(replayState);
         }
 
         public class CatchReplayState : ReplayState<CatchAction>

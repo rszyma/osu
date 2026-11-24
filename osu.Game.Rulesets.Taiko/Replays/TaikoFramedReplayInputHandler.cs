@@ -16,11 +16,16 @@ namespace osu.Game.Rulesets.Taiko.Replays
         {
         }
 
+        private static readonly List<TaikoAction> no_actions = new List<TaikoAction>();
+
+        private readonly ReplayState<TaikoAction> replayState = new ReplayState<TaikoAction>();
+
         protected override bool IsImportant(TaikoReplayFrame frame) => frame.Actions.Any();
 
         protected override void CollectReplayInputs(List<IInput> inputs)
         {
-            inputs.Add(new ReplayState<TaikoAction> { PressedActions = CurrentFrame?.Actions ?? new List<TaikoAction>() });
+            replayState.PressedActions = CurrentFrame?.Actions ?? no_actions;
+            inputs.Add(replayState);
         }
     }
 }

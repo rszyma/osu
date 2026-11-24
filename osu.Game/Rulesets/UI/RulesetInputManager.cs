@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -248,7 +249,8 @@ namespace osu.Game.Rulesets.UI
                 new TabletPenButtonInput([], state.Tablet.PenButtons).Apply(state, handler);
                 new TabletAuxiliaryButtonInput([], state.Tablet.AuxiliaryButtons).Apply(state, handler);
 
-                handler.HandleInputStateChange(new ReplayStateChangeEvent<T>(state, this, inputState.LastReplayState?.PressedActions.ToArray() ?? [], []));
+                handler.HandleInputStateChange(new ReplayStateChangeEvent<T>(state, this, inputState.LastPressedActions.ToList(), []));
+                inputState.LastPressedActions.Clear();
                 inputState.LastReplayState = null;
             }
         }
@@ -258,6 +260,11 @@ namespace osu.Game.Rulesets.UI
         where T : struct
     {
         public ReplayState<T>? LastReplayState;
+
+        /// <summary>
+        /// The actions which the last applied <see cref="ReplayState{T}"/> pressed.
+        /// </summary>
+        public readonly List<T> LastPressedActions = new List<T>();
 
         public RulesetInputManagerInputState(InputState state)
             : base(state)

@@ -16,11 +16,16 @@ namespace osu.Game.Rulesets.Mania.Replays
         {
         }
 
+        private static readonly List<ManiaAction> no_actions = new List<ManiaAction>();
+
+        private readonly ReplayState<ManiaAction> replayState = new ReplayState<ManiaAction>();
+
         protected override bool IsImportant(ManiaReplayFrame frame) => frame.Actions.Any();
 
         protected override void CollectReplayInputs(List<IInput> inputs)
         {
-            inputs.Add(new ReplayState<ManiaAction> { PressedActions = CurrentFrame?.Actions ?? new List<ManiaAction>() });
+            replayState.PressedActions = CurrentFrame?.Actions ?? no_actions;
+            inputs.Add(replayState);
         }
     }
 }
