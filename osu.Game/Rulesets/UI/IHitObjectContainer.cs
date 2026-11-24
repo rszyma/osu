@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using osu.Framework.Lists;
 using osu.Game.Rulesets.Objects.Drawables;
 
 namespace osu.Game.Rulesets.UI
@@ -14,11 +15,11 @@ namespace osu.Game.Rulesets.UI
         IEnumerable<DrawableHitObject> Objects { get; }
 
         /// <summary>
-        /// All currently in-use <see cref="DrawableHitObject"/>s that are alive.
+        /// All currently in-use <see cref="DrawableHitObject"/>s that are alive, in order of start time.
         /// </summary>
         /// <remarks>
         /// If this <see cref="IHitObjectContainer"/> uses pooled objects, this is equivalent to <see cref="Objects"/>.
         /// </remarks>
-        IEnumerable<DrawableHitObject> AliveObjects { get; }
+        SlimReadOnlyListWrapper<DrawableHitObject> AliveObjects { get; }
     }
 }

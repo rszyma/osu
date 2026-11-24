@@ -2,7 +2,6 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Rulesets.Osu.Objects.Drawables;
@@ -29,11 +28,25 @@ namespace osu.Game.Rulesets.Osu.UI
                 throw new InvalidOperationException($"{nameof(HitObjectContainer)} should be set before {nameof(CheckHittable)} is called.");
 
             DrawableHitObject? blockingObject = null;
+            double targetTime = hitObject.HitObject.StartTime;
 
-            foreach (var obj in enumerateHitObjectsUpTo(hitObject.HitObject.StartTime))
+            // Loops instead of an iterator, so that checking a hit does not allocate.
+            foreach (var obj in HitObjectContainer!.AliveObjects)
             {
+                if (obj.HitObject.StartTime >= targetTime)
+                    break;
+
                 if (hitObjectCanBlockFutureHits(obj))
                     blockingObject = obj;
+
+                foreach (var nestedObj in obj.NestedHitObjects)
+                {
+                    if (nestedObj.HitObject.StartTime >= targetTime)
+                        break;
+
+                    if (hitObjectCanBlockFutureHits(nestedObj))
+                        blockingObject = nestedObj;
+                }
             }
 
             if (blockingObject != null)
@@ -66,13 +79,29 @@ namespace osu.Game.Rulesets.Osu.UI
             if (CheckHittable(hitObject, hitObject.HitObject.StartTime + hitObject.Result.TimeOffset, hitObject.Result.Type) != ClickAction.Hit)
                 throw new InvalidOperationException($"A {hitObject} was hit before it became hittable!");
 
-            // Miss all hitobjects prior to the hit one.
-            foreach (var obj in enumerateHitObjectsUpTo(hitObject.HitObject.StartTime))
-            {
-                if (obj.Judged)
-                    continue;
+            double targetTime = hitObject.HitObject.StartTime;
 
-                if (hitObjectCanBlockFutureHits(obj))
+            // Miss all hitobjects prior to the hit one.
+            // Missing changes judgements but not the alive objects, so the list stays the same while iterating.
+            foreach (var obj in HitObjectContainer.AliveObjects)
+            {
+                if (obj.HitObject.StartTime >= targetTime)
+                    break;
+
+                missIfBlocking(obj);
+
+                foreach (var nestedObj in obj.NestedHitObjects)
+                {
+                    if (nestedObj.HitObject.StartTime >= targetTime)
+                        break;
+
+                    missIfBlocking(nestedObj);
+                }
+            }
+
+            static void missIfBlocking(DrawableHitObject obj)
+            {
+                if (!obj.Judged && hitObjectCanBlockFutureHits(obj))
                     ((DrawableOsuHitObject)obj).MissForcefully();
             }
         }
@@ -84,23 +113,5 @@ namespace osu.Game.Rulesets.Osu.UI
         private static bool hitObjectCanBlockFutureHits(DrawableHitObject hitObject)
             => hitObject is DrawableHitCircle;
 
-        private IEnumerable<DrawableHitObject> enumerateHitObjectsUpTo(double targetTime)
-        {
-            foreach (var obj in HitObjectContainer!.AliveObjects)
-            {
-                if (obj.HitObject.StartTime >= targetTime)
-                    yield break;
-
-                yield return obj;
-
-                foreach (var nestedObj in obj.NestedHitObjects)
-                {
-                    if (nestedObj.HitObject.StartTime >= targetTime)
-                        break;
-
-                    yield return nestedObj;
-                }
-            }
-        }
     }
 }

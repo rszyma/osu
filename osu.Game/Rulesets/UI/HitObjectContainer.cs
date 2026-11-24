@@ -8,8 +8,10 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions.ListExtensions;
 using osu.Framework.Extensions.TypeExtensions;
 using osu.Framework.Graphics;
+using osu.Framework.Lists;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Drawables;
@@ -21,7 +23,46 @@ namespace osu.Game.Rulesets.UI
     {
         public IEnumerable<DrawableHitObject> Objects => InternalChildren.Cast<DrawableHitObject>().OrderBy(h => h.HitObject.StartTime);
 
-        public IEnumerable<DrawableHitObject> AliveObjects => AliveEntries.Values.OrderBy(h => h.HitObject.StartTime);
+        /// <summary>
+        /// All alive <see cref="DrawableHitObject"/>s, in order of start time.
+        /// </summary>
+        /// <remarks>
+        /// The list is reused, and changes when the alive objects or their start times change.
+        /// </remarks>
+        public SlimReadOnlyListWrapper<DrawableHitObject> AliveObjects
+        {
+            get
+            {
+                if (!aliveObjectsValid)
+                {
+                    aliveObjects.Clear();
+
+                    foreach (var kvp in AliveEntries)
+                        aliveObjects.Add(kvp.Value);
+
+                    // A stable sort, as OrderBy was before.
+                    for (int i = 1; i < aliveObjects.Count; i++)
+                    {
+                        var obj = aliveObjects[i];
+                        double startTime = obj.HitObject.StartTime;
+
+                        int j = i - 1;
+
+                        for (; j >= 0 && aliveObjects[j].HitObject.StartTime > startTime; j--)
+                            aliveObjects[j + 1] = aliveObjects[j];
+
+                        aliveObjects[j + 1] = obj;
+                    }
+
+                    aliveObjectsValid = true;
+                }
+
+                return aliveObjects.AsSlimReadOnly();
+            }
+        }
+
+        private readonly List<DrawableHitObject> aliveObjects = new List<DrawableHitObject>();
+        private bool aliveObjectsValid;
 
         /// <summary>
         /// Invoked when a <see cref="DrawableHitObject"/> is judged.
@@ -44,16 +85,27 @@ namespace osu.Game.Rulesets.UI
         /// </remarks>
         internal event Action<HitObject> HitObjectUsageFinished;
 
-        private readonly Dictionary<DrawableHitObject, IBindable> startTimeMap = new Dictionary<DrawableHitObject, IBindable>();
 
         private readonly Dictionary<HitObjectLifetimeEntry, DrawableHitObject> nonPooledDrawableMap = new Dictionary<HitObjectLifetimeEntry, DrawableHitObject>();
 
         [Resolved(CanBeNull = true)]
         private IPooledHitObjectProvider pooledObjectProvider { get; set; }
 
+        private readonly HashSet<DrawableHitObject> startTimeBoundObjects = new HashSet<DrawableHitObject>();
+
+        private readonly Action<ValueChangedEvent<double>> onStartTimeChanged;
+
         public HitObjectContainer()
         {
             RelativeSizeAxes = Axes.Both;
+
+            onStartTimeChanged = _ =>
+            {
+                aliveObjectsValid = false;
+
+                if (LoadState >= LoadState.Ready)
+                    SortInternal();
+            };
         }
 
         protected override void LoadAsyncComplete()
@@ -88,6 +140,8 @@ namespace osu.Game.Rulesets.UI
 
         protected override void AddDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
         {
+            aliveObjectsValid = false;
+
             if (nonPooledDrawableMap.ContainsKey(entry)) return;
 
             addDrawable(drawable);
@@ -96,6 +150,8 @@ namespace osu.Game.Rulesets.UI
 
         protected override void RemoveDrawable(HitObjectLifetimeEntry entry, DrawableHitObject drawable)
         {
+            aliveObjectsValid = false;
+
             drawable.OnKilled();
             if (nonPooledDrawableMap.ContainsKey(entry)) return;
 
@@ -150,30 +206,24 @@ namespace osu.Game.Rulesets.UI
 
         #region Comparator + StartTime tracking
 
+        // The handler is cached and subscribed to directly instead of to a bound copy, so that adding a drawable does not allocate.
         private void bindStartTime(DrawableHitObject hitObject)
         {
-            var bindable = hitObject.StartTimeBindable.GetBoundCopy();
-
-            bindable.BindValueChanged(_ =>
-            {
-                if (LoadState >= LoadState.Ready)
-                    SortInternal();
-            });
-
-            startTimeMap[hitObject] = bindable;
+            if (startTimeBoundObjects.Add(hitObject))
+                hitObject.StartTimeBindable.ValueChanged += onStartTimeChanged;
         }
 
         private void unbindStartTime(DrawableHitObject hitObject)
         {
-            startTimeMap[hitObject].UnbindAll();
-            startTimeMap.Remove(hitObject);
+            if (startTimeBoundObjects.Remove(hitObject))
+                hitObject.StartTimeBindable.ValueChanged -= onStartTimeChanged;
         }
 
         private void unbindAllStartTimes()
         {
-            foreach (var kvp in startTimeMap)
-                kvp.Value.UnbindAll();
-            startTimeMap.Clear();
+            foreach (var hitObject in startTimeBoundObjects)
+                hitObject.StartTimeBindable.ValueChanged -= onStartTimeChanged;
+            startTimeBoundObjects.Clear();
         }
 
         protected override int Compare(Drawable x, Drawable y)
