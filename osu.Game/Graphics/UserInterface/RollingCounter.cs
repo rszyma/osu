@@ -84,7 +84,16 @@ namespace osu.Game.Graphics.UserInterface
 
         protected void UpdateDisplay()
         {
-            displayedCountText?.Text = FormatCount(DisplayedCount);
+            if (displayedCountText == null)
+                return;
+
+            // Rolling counters change in each frame while they roll, so avoid a string for each value where possible.
+            Span<char> buffer = stackalloc char[64];
+
+            if (TryFormatCount(DisplayedCount, buffer, out int charsWritten))
+                displayedCountText.SetText(buffer[..charsWritten]);
+            else
+                displayedCountText.Text = FormatCount(DisplayedCount);
         }
 
         protected override void LoadComplete()
@@ -145,6 +154,17 @@ namespace osu.Game.Graphics.UserInterface
         protected virtual LocalisableString FormatCount(T count)
         {
             return count.ToString();
+        }
+
+        /// <summary>
+        /// Writes the text which <see cref="FormatCount"/> would return into <paramref name="destination"/>.
+        /// This lets the counter display the count without allocating a string.
+        /// </summary>
+        /// <returns>Whether the count was written. If <c>false</c>, <see cref="FormatCount"/> is used.</returns>
+        protected virtual bool TryFormatCount(T count, Span<char> destination, out int charsWritten)
+        {
+            charsWritten = 0;
+            return false;
         }
 
         /// <summary>

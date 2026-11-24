@@ -3,6 +3,7 @@
 
 #nullable disable
 
+using System;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
@@ -39,6 +40,9 @@ namespace osu.Game.Graphics.UserInterface
             currentValue > newValue ? currentValue - newValue : newValue - currentValue;
 
         protected override LocalisableString FormatCount(long count) => count.ToString(formatString);
+
+        protected override bool TryFormatCount(long count, Span<char> destination, out int charsWritten)
+            => count.TryFormat(destination, out charsWritten, formatString);
 
         protected override OsuSpriteText CreateSpriteText()
             => base.CreateSpriteText().With(s => s.Font = s.Font.With(fixedWidth: true));

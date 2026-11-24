@@ -35,6 +35,9 @@ namespace osu.Game.Screens.Play.HUD
 
         protected override LocalisableString FormatCount(long count) => count.ToString();
 
+        protected override bool TryFormatCount(long count, Span<char> destination, out int charsWritten)
+            => count.TryFormat(destination, out charsWritten);
+
         protected override IHasText CreateText() => scoreText = new ArgonScoreTextComponent(Anchor.TopRight, BeatmapsetsStrings.ShowScoreboardHeadersScore.ToUpper())
         {
             WireframeOpacity = { BindTarget = WireframeOpacity },

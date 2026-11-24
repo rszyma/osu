@@ -38,6 +38,8 @@ namespace osu.Game.Screens.Play.HUD
             set => textPart.Text = value;
         }
 
+        public void SetText(ReadOnlySpan<char> text) => textPart.SetText(text);
+
         /// <summary>
         /// The template for the wireframe displayed behind the <see cref="Text"/>.
         /// Any character other than a dot is interpreted to mean a full segmented display "wireframe".

@@ -1,6 +1,8 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using System.Globalization;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.LocalisationExtensions;
 using osu.Framework.Graphics;
@@ -11,6 +13,7 @@ using osu.Game.Configuration;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Skinning;
+using osu.Game.Utils;
 using osuTK;
 
 namespace osu.Game.Screens.Play.HUD
@@ -32,6 +35,10 @@ namespace osu.Game.Screens.Play.HUD
 
         public bool UsesFixedAnchor { get; set; }
 
+        // The text component splits the text at '.', as LocalisableString.ToString() formats with the invariant culture.
+        protected override bool TryFormatCount(double count, Span<char> destination, out int charsWritten)
+            => count.FloorToDecimalDigits(4).TryFormat(destination, out charsWritten, "0.00%", CultureInfo.InvariantCulture);
+
         protected override IHasText CreateText() => new ArgonAccuracyTextComponent
         {
             WireframeOpacity = { BindTarget = WireframeOpacity },
@@ -51,13 +58,26 @@ namespace osu.Game.Screens.Play.HUD
             public LocalisableString Text
             {
                 get => wholePart.Text;
-                set
-                {
-                    string[] split = value.ToString().Replace("%", string.Empty).Split(".");
+                set => SetText(value.ToString());
+            }
 
-                    wholePart.Text = split[0];
-                    fractionPart.Text = "." + split[1];
-                }
+            public void SetText(ReadOnlySpan<char> text)
+            {
+                int percent = text.IndexOf('%');
+                if (percent >= 0)
+                    text = text[..percent];
+
+                int dot = text.IndexOf('.');
+                if (dot < 0)
+                    dot = text.Length;
+
+                wholePart.SetText(text[..dot]);
+
+                // The fraction part shows its dot.
+                Span<char> fraction = stackalloc char[Math.Max(1, text.Length - dot)];
+                fraction[0] = '.';
+                text[Math.Min(dot + 1, text.Length)..].CopyTo(fraction[1..]);
+                fractionPart.SetText(fraction);
             }
 
             public ArgonAccuracyTextComponent()

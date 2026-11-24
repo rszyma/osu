@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Globalization;
+using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
 using osu.Game.Graphics.Sprites;
@@ -28,7 +30,18 @@ namespace osu.Game.Graphics.UserInterface
             Current.Value = DisplayedCount = 1.0f;
         }
 
+        [Resolved]
+        private LocalisationManager? localisation { get; set; }
+
         protected override LocalisableString FormatCount(double count) => count.FormatAccuracy();
+
+        protected override bool TryFormatCount(double count, Span<char> destination, out int charsWritten)
+        {
+            // Matches FormatAccuracy, which formats with the culture of the current language.
+            var culture = localisation?.CurrentParameters.Value.Store?.EffectiveCulture ?? CultureInfo.InvariantCulture;
+
+            return count.FloorToDecimalDigits(4).TryFormat(destination, out charsWritten, "0.00%", culture);
+        }
 
         protected override double GetProportionalDuration(double currentValue, double newValue)
         {
