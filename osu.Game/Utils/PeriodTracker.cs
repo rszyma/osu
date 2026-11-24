@@ -63,7 +63,7 @@ namespace osu.Game.Utils
         }
     }
 
-    public readonly struct Period
+    public readonly struct Period : IEquatable<Period>
     {
         /// <summary>
         /// The start time of this period.
@@ -85,5 +85,12 @@ namespace osu.Game.Utils
             Start = start;
             End = end;
         }
+
+        // Without these, comparing periods (as a bindable does on each set) boxes and compares fields through reflection.
+        public bool Equals(Period other) => Start.Equals(other.Start) && End.Equals(other.End);
+
+        public override bool Equals(object? obj) => obj is Period other && Equals(other);
+
+        public override int GetHashCode() => HashCode.Combine(Start, End);
     }
 }
